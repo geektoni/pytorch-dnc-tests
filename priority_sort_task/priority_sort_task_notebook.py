@@ -38,6 +38,9 @@ from dnc.sdnc import SDNC
 from dnc.sam import SAM
 from dnc.util import *
 
+np.random.seed(42)
+T.manual_seed(42)
+
 def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
@@ -171,9 +174,9 @@ def compute_cost(output, target_out):
 
 from argparse import Namespace
 
-args = Namespace(input_size=9, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
+args = Namespace(input_size=10, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
                  lr=3e-5, optim="rmsprop", clip=10, batch_size=1, mem_size=20, mem_slot=128, read_heads=5,
-                 sparse_reads=10, temporal_reads=2, sequence_max_length=16, curriculum_increment=0, curriculum_freq=1000,
+                 sparse_reads=10, temporal_reads=2, sequence_max_length=20, curriculum_increment=0, curriculum_freq=1000,
                  cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100000, visdom=False)
 if args.visdom:
     viz = Visdom()
@@ -270,7 +273,9 @@ elif args.optim == 'adadelta':
 
 # List for keeping useful data
 costs = []
-last_save_losses=[]
+last_costs = []
+last_losses = []
+save_losses= []
 seq_lengths = []
 
 (chx, mhx, rv) = (None, None, None)
@@ -304,17 +309,22 @@ for epoch in range(iterations + 1):
     mhx = { k : (v.detach() if isinstance(v, var) else v) for k, v in mhx.items() }
 
     # Save loss value
-    last_save_losses.append(loss_value)
+    save_losses.append(loss_value)
+    last_losses.append(loss_value)
 
     # Save cost value
-    costs.append(compute_cost(output, target_output).item())
+    current_cost = compute_cost(output, target_output).item()
+    costs.append(current_cost)
+    last_costs.append(current_cost)
 
     # Save sequence length
     seq_lengths.append(args.input_size)
 
     if summarize:
-        loss = np.mean(last_save_losses)
-        cost = np.mean(costs)
+        loss = np.mean(last_losses)
+        cost = np.mean(last_costs)
+        last_losses = []
+        last_costs = []
       # print(input_data)
       # print("1111111111111111111111111111111111111111111111")
       # print(target_output)
@@ -326,7 +336,9 @@ for epoch in range(iterations + 1):
             raise Exception('nan Loss')
 
     if summarize and rnn.debug:
-        loss = np.mean(last_save_losses)
+        loss = np.mean(last_losses)
+        last_losses = []
+        last_costs = []
       # print(input_data)
       # print("1111111111111111111111111111111111111111111111")
       # print(target_output)
@@ -451,7 +463,7 @@ for epoch in range(iterations + 1):
         # Save data
         performance_data_path = os.path.join(ckpts_dir, 'results_{}.csv'.format(epoch))
         content = {
-          "loss": last_save_losses,
+          "loss": save_losses,
           "cost": costs,
           "seq_lengths": seq_lengths
         }
