@@ -286,7 +286,7 @@ for epoch in range(iterations + 1):
     #random_length = np.random.randint(1, sequence_max_length + 1)
     random_length=sequence_max_length
 
-    input_data, target_output = generate_data(batch_size, random_length, args.input_size, args.cuda)
+    input_data, target_output = generate_data(batch_size, random_length, args.input_size, cuda=args.cuda)
 
     if rnn.debug:
         output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
