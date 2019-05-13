@@ -100,13 +100,6 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
         # Concatenate the tensor to the previous one
         inp = torch.cat((inp, inp_tmp), 1)
 
-    # As final step, we add to the final input the sequence
-    inp_tmp = torch.zeros(batch_size, (length + 1), size)
-    inp_tmp[:, :(length), :(size - 2)] = seq
-    inp_tmp[:, :(length), (size - 2):] = priority
-    inp_tmp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
-    inp = torch.cat((inp, inp_tmp), 1)
-
     outp = inp.numpy()
 
     # Strip all the binary vectors into a list
