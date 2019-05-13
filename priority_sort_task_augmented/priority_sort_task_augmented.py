@@ -38,30 +38,12 @@ from dnc.sdnc import SDNC
 from dnc.sam import SAM
 from dnc.util import *
 
+torch.manual_seed(42)
+np.random.seed(42)
+
 def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
-
-def UNgenerate_data(batch_size, length, size, cuda=-1):
-
-    print(batch_size, length, size)
-
-    input_data = np.zeros((batch_size, 2 * length + 1, size), dtype=np.float32)
-    target_output = np.zeros((batch_size, 2 * length + 1, size), dtype=np.float32)
-
-    sequence = np.random.binomial(1, 0.5, (batch_size, length, size - 1))
-
-    input_data[:, :length, :size - 1] = sequence
-    input_data[:, length, -1] = 1  # the end symbol
-    target_output[:, length + 1:, :size - 1] = sequence
-
-    input_data = T.from_numpy(input_data)
-    target_output = T.from_numpy(target_output)
-    if cuda != -1:
-        input_data = input_data.cuda()
-        target_output = target_output.cuda()
-    return var(input_data), var(target_output)
-
 
 def generate_data(batch_size, length, size, steps=1, cuda=-1):
 
@@ -81,6 +63,10 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     inp[:, :(length), :(size - 2)] = seq
     inp[:, :(length), (size - 2):] = priority
     inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
+
+    # If the length is just 1, then add the delimiter
+    if (steps==1):
+        inp[:, length, size - 1] = 1
 
     # For each step, we add a copy of the sequence
     for s in range(2,steps+1):
@@ -111,26 +97,28 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     temp = []
     for i in range(length):
         temp.append(outp[0][i])
-    temp.sort(key=lambda x: x[size-1], reverse=True)  # Sort elements descending order
+    temp.sort(key=lambda x: x[size-2], reverse=True)  # Sort elements descending order
 
     # FIXME
     # Ugly hack to present the tensor structure as the one
     # required by the framework
     layer = []
     for i in range(len(temp)):
-        tmp_layer = []
-        tmp_layer.append(np.array(temp[i]))
-        layer.append(tmp_layer)
+        layer.append(np.array(temp[i]))
+    output_final = []
+    output_final.append(layer)
 
     # Convert everything to numpy and to a tensor
-    outp = torch.from_numpy(np.array(layer))
+    outp = torch.from_numpy(np.array(output_final))
+
+    # Add an empy line at the end to simulate the delimiter
+    outp = torch.cat((outp, torch.zeros(batch_size, 1, size)),1)
 
     if cuda != -1:
         inp = inp.cuda()
         outp = outp.cuda()
 
     return var(inp.float()), var(outp.float())
-
 
 def criterion(predictions, targets):
     return T.mean(
@@ -151,18 +139,7 @@ def binarize_matrix(matrix):
     result.append(np.array(bfunc(r)))
   return np.array(result)
 
-def compute_cost(model, batch_size, length, size, mhx, cuda=-1):
-
-  input_data, target_out = generate_data(batch_size, length, size, cuda=-1)
-
-  if cuda != -1:
-    input_data = input_data.cuda()
-    target_out = target_out.cuda()
-
-  if rnn.debug:
-    output, (chx, mhx, rv), v = model(input_data)
-  else:
-    output, (chx, mhx, rv) = model(input_data)
+def compute_cost(output, target_out):
 
   # Binarize the result
   y_out_binarized = []
@@ -183,10 +160,10 @@ def compute_cost(model, batch_size, length, size, mhx, cuda=-1):
 
 from argparse import Namespace
 
-args = Namespace(input_size=10, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
+args = Namespace(input_size=8, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
                  lr=1e-4, optim="rmsprop", clip=10, batch_size=1, mem_size=20, mem_slot=128, read_heads=5,
-                 sparse_reads=10, temporal_reads=2, sequence_max_length=16, curriculum_increment=0, curriculum_freq=1000,
-                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100, visdom=False, steps=1)
+                 sparse_reads=10, temporal_reads=2, sequence_max_length=4, curriculum_increment=0, curriculum_freq=1000,
+                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100000, visdom=False, steps=3)
 if args.visdom:
     viz = Visdom()
 
@@ -291,17 +268,16 @@ for epoch in range(iterations + 1):
     llprint("\rIteration {ep}/{tot}".format(ep=epoch, tot=iterations))
     optimizer.zero_grad()
 
-    #random_length = np.random.randint(1, sequence_max_length + 1)
     random_length=sequence_max_length
 
-    input_data, target_output = generate_data(batch_size, random_length, args.input_size, args.cuda)
+    input_data, target_output = generate_data(batch_size, random_length, args.input_size, args.steps, args.cuda)
 
     if rnn.debug:
         output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
     else:
         output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
 
-    loss = criterion((output), target_output)
+    loss = criterion((output[:, (random_length+1)*args.steps:, :]), target_output)
 
     loss.backward()
 
@@ -320,7 +296,9 @@ for epoch in range(iterations + 1):
     last_save_losses.append(loss_value)
 
     # Save cost value
-    costs.append(compute_cost(rnn, batch_size, random_length, args.input_size, mhx, args.cuda).item())
+    costs.append(compute_cost(output[:, (random_length+1)*args.steps:, :], target_output).item())
+
+    print(output[:, (random_length+1)*args.steps:, :])
 
     # Save sequence length
     seq_lengths.append(args.input_size)

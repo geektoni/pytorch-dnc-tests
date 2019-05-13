@@ -21,6 +21,10 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     inp[:, :(length), (size - 2):] = priority
     inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
 
+    # If the length is just 1, then add the delimiter
+    if (steps==1):
+        inp[:, length, size - 1] = 1
+
     # For each step, we add a copy of the sequence
     for s in range(2,steps+1):
         inp_tmp = torch.zeros(batch_size, (length + 1), size)
@@ -50,19 +54,22 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     temp = []
     for i in range(length):
         temp.append(outp[0][i])
-    temp.sort(key=lambda x: x[size-1], reverse=True)  # Sort elements descending order
+    temp.sort(key=lambda x: x[size-2], reverse=True)  # Sort elements descending order
 
     # FIXME
     # Ugly hack to present the tensor structure as the one
     # required by the framework
     layer = []
     for i in range(len(temp)):
-        tmp_layer = []
-        tmp_layer.append(np.array(temp[i]))
-        layer.append(tmp_layer)
+        layer.append(np.array(temp[i]))
+    output_final = []
+    output_final.append(layer)
 
     # Convert everything to numpy and to a tensor
-    outp = torch.from_numpy(np.array(layer))
+    outp = torch.from_numpy(np.array(output_final))
+
+    # Add an empy line at the end to simulate the delimiter
+    outp = torch.cat((outp, torch.zeros(batch_size, 1, size)),1)
 
     if cuda != -1:
         inp = inp.cuda()
@@ -72,6 +79,7 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
 
 if __name__ == "__main__":
 
-    input, output = generate_data(1, 2, 10, 2)
+    input, output = generate_data(1, 2, 10, 1)
     print(input)
+    print(input.shape)
     print(output)
