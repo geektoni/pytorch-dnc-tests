@@ -150,18 +150,7 @@ def binarize_matrix(matrix):
     result.append(np.array(bfunc(r)))
   return np.array(result)
 
-def compute_cost(model, batch_size, length, size, mhx, cuda=-1):
-
-  input_data, target_out = generate_data(batch_size, length, size, cuda=-1)
-
-  if cuda != -1:
-    input_data = input_data.cuda()
-    target_out = target_out.cuda()
-
-  if rnn.debug:
-    output, (chx, mhx, rv), v = model(input_data)
-  else:
-    output, (chx, mhx, rv) = model(input_data)
+def compute_cost(output, target_out):
 
   # Binarize the result
   y_out_binarized = []
@@ -318,7 +307,7 @@ for epoch in range(iterations + 1):
     last_save_losses.append(loss_value)
 
     # Save cost value
-    costs.append(compute_cost(rnn, batch_size, random_length, args.input_size, mhx, args.cuda).item())
+    costs.append(compute_cost(output, target_output).item())
 
     # Save sequence length
     seq_lengths.append(args.input_size)
