@@ -63,66 +63,80 @@ def UNgenerate_data(batch_size, length, size, cuda=-1):
     return var(input_data), var(target_output)
 
 
-def generate_data(batch_size, length, size, cuda=-1):
+def generate_data(batch_size, length, size, steps=1, cuda=-1):
 
-        seq = np.random.binomial(1, 0.5, (batch_size, length, size-1))
-        seq = torch.from_numpy(seq)
+    # Generate the binary sequences of length equal to size.
+    # We leave 2 bits empty for the priority and the delimiter.
+    # Moreover, we add an empty vector which will be used as signal
+    # for printing the result
+    seq = np.random.binomial(1, 0.5, (batch_size, length, size - 2))
+    seq = torch.from_numpy(seq)
 
-        # The input includes an additional channel used for the delimiter
-        inp = torch.zeros(batch_size, length, size)
+    # Add priority number (just a single one drawn from the uniform distribution)
+    priority = np.random.uniform(-1, 1, (batch_size, length, 1))
+    priority = torch.from_numpy(priority)
 
-        # Add priority number (just a single one drawn from the uniform distribution)
-        priority = np.random.uniform(-1, 1, (batch_size, length, 1))
-        priority = torch.from_numpy(priority)
+    # Generate the first tensor
+    inp = torch.zeros(batch_size, (length + 1), size)
+    inp[:, :(length), :(size - 2)] = seq
+    inp[:, :(length), (size - 2):] = priority
+    inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
 
-        # Construct the input vectors
-        inp[:, :length, :(size-1)] = seq
-        inp[:, :length, (size-1):] = priority  # priority
+    # If the length is just 1, then add the delimiter
+    if (steps==1):
+        inp[:, length, size - 1] = 1
 
-        # Add the delimiter
-        #inp_delim = torch.zeros(batch_size, length+1, size+2)
-        #inp_delim[:, :(length), :(size+1)] = inp
-        #inp_delim[:, length, size+1] = 1.0  # delimiter in our control channel
+    # For each step, we add a copy of the sequence
+    for s in range(2,steps+1):
+        inp_tmp = torch.zeros(batch_size, (length + 1), size)
+        inp_tmp[:, :(length), :(size-2)] = seq
+        inp_tmp[:, :(length), (size-2):] = priority
+        inp_tmp[:, :(length), (size-1):] = torch.zeros(batch_size, length, 1)
 
-        # Construct the output which will be a sorterd version of
-        # the sequences given by looking at the priority
-        #outp = inp_delim.numpy()
-        outp = inp.numpy()
+        # If this is the last repetition then we set the bit to 1
+        if (s == steps):
+            inp_tmp[:, length, size-1] = 1
 
-        # Strip all the binary vectors into a list
-        # and sort the list by looking at the last column
-        # (which will contain the priority)
-        temp = []
-        for i in range(len(outp)):
-            temp.append(outp[i][0])
-        #temp = [e[:size+1] for e in temp]
-        temp.sort(key=lambda x: x[size-1], reverse=True) # Sort elements descending order
+        # Concatenate the tensor to the previous one
+        inp = torch.cat((inp, inp_tmp), 1)
 
-        # Keep only the highest entries as specified in the paper.
-        # This means that for 20 entries we want to predict only the highest 16.
-        # This will be done only if a sequence is larger than 4 elements.
-        #if len(temp) > 4:
-        #    del temp[-4:]
+    # As final step, we add to the final input the sequence
+    inp_tmp = torch.zeros(batch_size, (length + 1), size)
+    inp_tmp[:, :(length), :(size - 2)] = seq
+    inp_tmp[:, :(length), (size - 2):] = priority
+    inp_tmp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
+    inp = torch.cat((inp, inp_tmp), 1)
 
-        # FIXME
-        # Ugly hack to present the tensor structure as the one
-        # required by the framework
-        layer = []
-        for i in range(len(temp)):
-            tmp_layer = []
-            tmp_layer.append(np.array(temp[i]))
-            layer.append(tmp_layer)
+    outp = inp.numpy()
 
-        # Convert everything to numpy and to a tensor
-        outp = torch.from_numpy(np.array(layer))
+    # Strip all the binary vectors into a list
+    # and sort the list by looking at the last column
+    # (which will contain the priority)
+    temp = []
+    for i in range(length):
+        temp.append(outp[0][i])
+    temp.sort(key=lambda x: x[size-2], reverse=True)  # Sort elements descending order
 
-        if cuda != -1:
-          #inp_delim = inp_delim.cuda()
-          inp = inp.cuda()
-          outp = outp.cuda()
+    # FIXME
+    # Ugly hack to present the tensor structure as the one
+    # required by the framework
+    layer = []
+    for i in range(len(temp)):
+        layer.append(np.array(temp[i]))
+    output_final = []
+    output_final.append(layer)
 
-        return var(inp.float()), var(outp.float())
+    # Convert everything to numpy and to a tensor
+    outp = torch.from_numpy(np.array(output_final))
 
+    # Add an empy line at the end to simulate the delimiter
+    outp = torch.cat((outp, torch.zeros(batch_size, 1, size)),1)
+
+    if cuda != -1:
+        inp = inp.cuda()
+        outp = outp.cuda()
+
+    return var(inp.float()), var(outp.float())
 
 def criterion(predictions, targets):
     return T.mean(
@@ -176,9 +190,9 @@ def compute_cost(model, batch_size, length, size, mhx, cuda=-1):
 from argparse import Namespace
 
 args = Namespace(input_size=9, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
-                 lr=1e-4, optim="rmsprop", clip=10, batch_size=1, mem_size=20, mem_slot=128, read_heads=5,
+                 lr=3e-5, optim="rmsprop", clip=10, batch_size=1, mem_size=20, mem_slot=128, read_heads=5,
                  sparse_reads=10, temporal_reads=2, sequence_max_length=16, curriculum_increment=0, curriculum_freq=1000,
-                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100, visdom=False)
+                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100000, visdom=False)
 if args.visdom:
     viz = Visdom()
 

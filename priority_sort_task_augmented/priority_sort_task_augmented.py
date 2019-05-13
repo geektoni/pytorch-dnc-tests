@@ -238,7 +238,6 @@ elif args.memory_type == 'sam':
 else:
     raise Exception('Not recognized type of memory')
 
-print(rnn)
 # register_nan_checks(rnn)
 
 if args.cuda != -1:
@@ -297,9 +296,7 @@ for epoch in range(iterations + 1):
 
     # Save cost value
     costs.append(compute_cost(output[:, (random_length+1)*args.steps:, :], target_output).item())
-
-    print(output[:, (random_length+1)*args.steps:, :])
-
+    
     # Save sequence length
     seq_lengths.append(args.input_size)
 
