@@ -16,7 +16,7 @@ import json
 sys.path.insert(0, os.path.join('..', '..'))
 
 import torch as T
-from torch.autograd import Variable as var
+from torch import autograd
 import torch.nn.functional as F
 import torch.optim as optim
 
@@ -125,7 +125,7 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
         inp = inp.cuda()
         outp = outp.cuda()
 
-    return var(inp.float()), var(outp.float())
+    return inp.float(), outp.float()
 
 def criterion(predictions, targets):
     return T.mean(
@@ -169,8 +169,8 @@ from argparse import Namespace
 
 args = Namespace(input_size=10, rnn_type="lstm", nhid=100, dropout=0, memory_type="dnc", nlayer=1, nhlayer=2,
                  lr=3e-5, optim="rmsprop", clip=10, batch_size=1, mem_size=20, mem_slot=128, read_heads=5,
-                 sparse_reads=10, temporal_reads=2, sequence_max_length=20, curriculum_increment=0, curriculum_freq=1000,
-                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100000, visdom=True)
+                 sparse_reads=10, temporal_reads=2, sequence_max_length=5, curriculum_increment=0, curriculum_freq=1000,
+                 cuda=-1, iterations=1000000, summarize_freq=100, check_freq=100000, visdom=False)
 if args.visdom:
     viz = Visdom()
 
@@ -204,7 +204,7 @@ if args.memory_type == 'dnc':
     gpu_id=args.cuda,
     debug=args.visdom,
     batch_first=True,
-    independent_linears=True
+    independent_linears=False
 )
 elif args.memory_type == 'sdnc':
     rnn = SDNC(
@@ -271,6 +271,11 @@ last_losses = []
 save_losses= []
 seq_lengths = []
 
+# Create the loss object
+
+bce_loss = nn.BCELoss(reduction='mean')
+sigm = nn.Sigmoid()
+
 (chx, mhx, rv) = (None, None, None)
 for epoch in range(iterations + 1):
     llprint("\rIteration {ep}/{tot}".format(ep=epoch, tot=iterations))
@@ -281,37 +286,39 @@ for epoch in range(iterations + 1):
 
     input_data, target_output = generate_data(batch_size, random_length, args.input_size, cuda=args.cuda)
 
-    if rnn.debug:
-        output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
-    else:
-        output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
+    with autograd.detect_anomaly():
 
-    loss = criterion((output), target_output)
+        if rnn.debug:
+            output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
+        else:
+            output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
 
-    loss.backward()
+        #loss = criterion((output), target_output)
+        loss = bce_loss(sigm(output), target_output)
+        loss.backward()
 
-    T.nn.utils.clip_grad_norm_(rnn.parameters(), args.clip)
-    optimizer.step()
-    loss_value = loss.item()
+        T.nn.utils.clip_grad_norm_(rnn.parameters(), args.clip)
+        optimizer.step()
+        loss_value = loss.item()
 
-    summarize = (epoch % summarize_freq == 0)
-    take_checkpoint = (epoch != 0) and (epoch % check_freq == 0)
-    increment_curriculum = (epoch != 0) and (epoch % args.curriculum_freq == 0)
+        summarize = (epoch % summarize_freq == 0)
+        take_checkpoint = (epoch != 0) and (epoch % check_freq == 0)
+        increment_curriculum = (epoch != 0) and (epoch % args.curriculum_freq == 0)
 
-    # detach memory from graph
-    mhx = { k : (v.detach() if isinstance(v, var) else v) for k, v in mhx.items() }
+        # detach memory from graph
+        mhx = { k : v.detach() for k, v in mhx.items() }
 
-    # Save loss value
-    save_losses.append(loss_value)
-    last_losses.append(loss_value)
+        # Save loss value
+        save_losses.append(loss_value)
+        last_losses.append(loss_value)
 
-    # Save cost value
-    current_cost = compute_cost(output, target_output).item()
-    costs.append(current_cost)
-    last_costs.append(current_cost)
+        # Save cost value
+        current_cost = compute_cost(output, target_output).item()
+        costs.append(current_cost)
+        last_costs.append(current_cost)
 
-    # Save sequence length
-    seq_lengths.append(args.input_size)
+        # Save sequence length
+        seq_lengths.append(args.input_size)
 
     if summarize:
         loss = np.mean(last_losses)
