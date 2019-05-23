@@ -33,18 +33,21 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     if (steps==1):
         inp[:, length, size - 1] = 1
 
-    # For each step, we add a copy of the sequence
+    # For each step, we add an empty space
     for s in range(2,steps+1):
         inp_tmp = torch.zeros(batch_size, (length + 1), size)
-        inp_tmp[:, :(length), :(size-2)] = seq
-        inp_tmp[:, :(length), (size-2):] = priority
-        inp_tmp[:, :(length), (size-1):] = torch.zeros(batch_size, length, 1)
 
-        # If this is the last repetition then we set the bit to 1
+        # If this is the last repetition then we set the bit to 1.
         if (s == steps):
             inp_tmp[:, length, size-1] = 1
 
         # Concatenate the tensor to the previous one
+        inp = torch.cat((inp, inp_tmp), 1)
+
+    # We then add an empty section in which we need to store the result
+    # only if the steps are greater than 1
+    if steps > 1:
+        inp_tmp = torch.zeros(batch_size, (length), size)
         inp = torch.cat((inp, inp_tmp), 1)
 
     outp = inp.numpy()
@@ -80,7 +83,7 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
         inp = inp.cuda()
         outp = outp.cuda()
 
-    return inp.float(), outp.float()
+    return inp.float(), outp.float()[:, :-1, :]
 
 def criterion(predictions, targets):
     return T.mean(
