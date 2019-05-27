@@ -358,15 +358,20 @@ if __name__ == "__main__":
 
         # Take a checkpoint, save the model and the data
         if take_checkpoint:
-            check_ptr = os.path.join(ckpts_dir, 'step_{}.pth'.format(epoch))
+            check_ptr = os.path.join(ckpts_dir, 'model_{}_{}_{}_{}_{}.pth'.format(batch_size,
+                                                                                    random_length,
+                                                                                    args.input_size+2,
+                                                                                    args.steps,
+                                                                                    epoch))
             llprint("\n[*] Saving Checkpoint to {}\n".format(check_ptr))
             cur_weights = rnn.state_dict()
             T.save(cur_weights, check_ptr)
 
             # Save data
-            performance_data_path = os.path.join(ckpts_dir, 'results_{}_{}_{}_{}.json'.format(batch_size,
+            performance_data_path = os.path.join(ckpts_dir, 'results_{}_{}_{}_{}_{}.json'.format(batch_size,
                                                                                               random_length,
                                                                                               args.input_size+2,
+                                                                                              args.steps,
                                                                                               epoch))
             content = {
               "loss": save_losses,
