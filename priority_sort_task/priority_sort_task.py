@@ -364,7 +364,10 @@ if __name__ == "__main__":
             T.save(cur_weights, check_ptr)
 
             # Save data
-            performance_data_path = os.path.join(ckpts_dir, 'results_{}.csv'.format(epoch))
+            performance_data_path = os.path.join(ckpts_dir, 'results_{}_{}_{}_{}.json'.format(batch_size,
+                                                                                              random_length,
+                                                                                              args.input_size+2,
+                                                                                              epoch))
             content = {
               "loss": save_losses,
               "cost": costs,
