@@ -6,4 +6,4 @@
 #PBS -M giovanni.detoni@studenti.unitn.it
 #PBS -m be
 
-./priority_sort_task/priority_sort_task.py -lr=$1 -checkpoint_dir=$2 -sequence_max_length=8
+~/master/priority_sort_task/priority_sort_task.py -lr=$learning_rate -checkpoint_dir=$check_dir -sequence_max_length=8
