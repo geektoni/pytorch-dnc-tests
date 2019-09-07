@@ -10,7 +10,7 @@ def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
 
-def generate_data(batch_size, length, size, steps=1, cuda=-1):
+def generate_data(batch_size, length, size, steps=1, cuda=-1, non_uniform=False):
 
     # Generate the binary sequences of length equal to size.
     # We leave 2 bits empty for the priority and the delimiter.
@@ -19,8 +19,12 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1):
     seq = np.random.binomial(1, 0.5, (batch_size, length, size - 2))
     seq = torch.from_numpy(seq)
 
-    # Add priority number (just a single one drawn from the uniform distribution)
-    priority = np.random.uniform(-1, 1, (batch_size, length, 1))
+    # Add priority number (just a single one drawn from the uniform distribution
+    # or from the beta distribution)
+    if not non_uniform:
+        priority = np.random.uniform(-1, 1, (batch_size, length, 1))
+    else:
+        priority = np.random.beta(1,3, (batch_size, length, 1))
     priority = torch.from_numpy(priority)
 
     # Generate the first tensor
