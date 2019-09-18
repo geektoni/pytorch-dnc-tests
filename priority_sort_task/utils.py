@@ -16,7 +16,7 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
     # We leave 2 bits empty for the priority and the delimiter.
     # Moreover, we add an empty vector which will be used as signal
     # for printing the result
-    seq = np.random.binomial(1, 0.5, (batch_size, length, size - 2))
+    seq = np.random.binomial(1, 0.5, (batch_size, length, size - 3))
     seq = torch.from_numpy(seq)
 
     # Add priority number (just a single one drawn from the uniform distribution
@@ -29,20 +29,29 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
 
     # Generate the first tensor
     inp = torch.zeros(batch_size, (length + 1), size)
-    inp[:, :(length), :(size - 2)] = seq
-    inp[:, :(length), (size - 2):] = priority
-    inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
+    inp[:, :(length), :(size - 3)] = seq
+    inp[:, :(length), (size - 3):] = priority
+    inp[:, :(length), (size - 2):] = torch.zeros(batch_size, length, 1) # end of sequence
+    inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1) # output the result
 
-    # If the length is just 1, then add the delimiter
+    # If the length is just 1, then add the delimiter and the end of sequence
     if (steps==0):
+        inp[:, length, size - 2] = 1 # set the end of sequence
         inp[:, length, size - 1] = 1
+    else:
+        # add delimiter vector
+        inp[:, length, size - 2] = 1 # set the end of sequence
 
     # For each step, we add an empty space
-    for s in range(0,steps):
+    for s in range(0,steps+1):
+
+        if steps==0:
+            break;
+
         inp_tmp = torch.zeros(batch_size, (1), size)
 
         # If this is the last repetition then we set the bit to 1.
-        if (s == steps-1):
+        if (s == steps):
             inp_tmp[:, 0, size-1] = 1
 
         # Concatenate the tensor to the previous one
@@ -64,7 +73,7 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
         temp = []
         for i in range(length):
             temp.append(outp[b][i])
-        temp.sort(key=lambda x: x[size-2], reverse=True)  # Sort elements descending order
+        temp.sort(key=lambda x: x[size-3], reverse=True)  # Sort elements descending order
         temp_total.append(temp)
 
     # FIXME

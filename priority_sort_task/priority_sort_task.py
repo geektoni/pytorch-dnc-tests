@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     if args.memory_type == 'dnc':
         rnn = DNC(
-        input_size=args.input_size+2,
+        input_size=args.input_size+3,
         hidden_size=args.nhid,
         rnn_type=args.rnn_type,
         num_layers=args.nlayer,
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     )
     elif args.memory_type == 'sdnc':
         rnn = SDNC(
-        input_size=args.input_size+2,
+        input_size=args.input_size+3,
         hidden_size=args.nhid,
         rnn_type=args.rnn_type,
         num_layers=args.nlayer,
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     )
     elif args.memory_type == 'sam':
         rnn = SAM(
-        input_size=args.input_size+2,
+        input_size=args.input_size+3,
         hidden_size=args.nhid,
         rnn_type=args.rnn_type,
         num_layers=args.nlayer,
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
-        input_data, target_output = generate_data(batch_size, random_length, args.input_size+2, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority)
+        input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority)
 
         with autograd.detect_anomaly():
 
@@ -198,9 +198,9 @@ if __name__ == "__main__":
             # the delimiter bit or the priority. This has to be done in order to
             # have a negative loss.
             if args.steps == 0:
-                loss = bce_loss(sigm(output[:, :-1, :-2]), target_output[:,:,:-2])
+                loss = bce_loss(sigm(output[:, :-1, :-3]), target_output[:,:,:-3])
             else:
-                loss = bce_loss(sigm(output[:, ((random_length + 1) + args.steps):, :-2]), target_output[:,:,:-2])
+                loss = bce_loss(sigm(output[:, ((random_length+1)+args.steps+1):, :-3]), target_output[:,:,:-3])
 
             loss.backward()
 
@@ -225,9 +225,9 @@ if __name__ == "__main__":
 
             # Save cost value
             if args.steps==0:
-                current_cost = compute_cost(sigm(output[:, :-1, :-2]), target_output[:,:,:-2], batch_size=batch_size).item()
+                current_cost = compute_cost(sigm(output[:, :-1, :-3]), target_output[:,:,:-3], batch_size=batch_size).item()
             else:
-                current_cost = compute_cost(sigm(output[:, ((random_length + 1) * args.steps):, :-2]), target_output[:, :, :-2], batch_size=batch_size).item()
+                current_cost = compute_cost(sigm(output[:, ((random_length+1)+args.steps+1):, :-3]), target_output[:, :, :-3], batch_size=batch_size).item()
             costs.append(current_cost)
             last_costs.append(current_cost)
 
@@ -362,7 +362,7 @@ if __name__ == "__main__":
         if take_checkpoint:
             check_ptr = os.path.join(ckpts_dir, 'model_{}_{}_{}_{}_{}.pth'.format(batch_size,
                                                                                     random_length,
-                                                                                    args.input_size+2,
+                                                                                    args.input_size+3,
                                                                                     args.steps,
                                                                                     epoch))
             llprint("\n[*] Saving Checkpoint to {}\n".format(check_ptr))
@@ -372,7 +372,7 @@ if __name__ == "__main__":
             # Save data
             performance_data_path = os.path.join(ckpts_dir, 'results_{}_{}_{}_{}_{}.json'.format(batch_size,
                                                                                               random_length,
-                                                                                              args.input_size+2,
+                                                                                              args.input_size+3,
                                                                                               args.steps,
                                                                                               epoch))
             content = {
