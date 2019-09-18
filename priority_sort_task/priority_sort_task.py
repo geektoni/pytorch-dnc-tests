@@ -197,10 +197,10 @@ if __name__ == "__main__":
             # We compute the loss by taking into account only the vectors and not
             # the delimiter bit or the priority. This has to be done in order to
             # have a negative loss.
-            if args.steps == 1:
+            if args.steps == 0:
                 loss = bce_loss(sigm(output[:, :-1, :-2]), target_output[:,:,:-2])
             else:
-                loss = bce_loss(sigm(output[:, ((random_length + 1) * args.steps):, :-2]), target_output[:,:,:-2])
+                loss = bce_loss(sigm(output[:, ((random_length + 1) + args.steps):, :-2]), target_output[:,:,:-2])
 
             loss.backward()
 
@@ -224,7 +224,7 @@ if __name__ == "__main__":
             last_losses.append(loss_value)
 
             # Save cost value
-            if args.steps==1:
+            if args.steps==0:
                 current_cost = compute_cost(sigm(output[:, :-1, :-2]), target_output[:,:,:-2], batch_size=batch_size).item()
             else:
                 current_cost = compute_cost(sigm(output[:, ((random_length + 1) * args.steps):, :-2]), target_output[:, :, :-2], batch_size=batch_size).item()

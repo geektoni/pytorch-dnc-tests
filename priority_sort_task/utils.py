@@ -10,7 +10,7 @@ def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
 
-def generate_data(batch_size, length, size, steps=1, cuda=-1, non_uniform=False):
+def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False):
 
     # Generate the binary sequences of length equal to size.
     # We leave 2 bits empty for the priority and the delimiter.
@@ -34,23 +34,23 @@ def generate_data(batch_size, length, size, steps=1, cuda=-1, non_uniform=False)
     inp[:, :(length), (size - 1):] = torch.zeros(batch_size, length, 1)
 
     # If the length is just 1, then add the delimiter
-    if (steps==1):
+    if (steps==0):
         inp[:, length, size - 1] = 1
 
     # For each step, we add an empty space
-    for s in range(2,steps+1):
-        inp_tmp = torch.zeros(batch_size, (length + 1), size)
+    for s in range(0,steps):
+        inp_tmp = torch.zeros(batch_size, (1), size)
 
         # If this is the last repetition then we set the bit to 1.
-        if (s == steps):
-            inp_tmp[:, length, size-1] = 1
+        if (s == steps-1):
+            inp_tmp[:, 0, size-1] = 1
 
         # Concatenate the tensor to the previous one
         inp = torch.cat((inp, inp_tmp), 1)
 
     # We then add an empty section in which we need to store the result
     # only if the steps are greater than 1
-    if steps > 1:
+    if steps > 0:
         inp_tmp = torch.zeros(batch_size, (length), size)
         inp = torch.cat((inp, inp_tmp), 1)
 
