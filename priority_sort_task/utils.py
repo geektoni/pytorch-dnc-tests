@@ -30,7 +30,9 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
     if not non_uniform:
         priority = np.random.uniform(-1, 1, (batch_size, length, 1))
     else:
-        priority = np.random.beta(1,3, (batch_size, length, 1))
+        alpha = np.random.uniform(1, 100)
+        beta = np.random.uniform(1, 100)
+        priority = np.random.beta(alpha, beta, (batch_size, length, 1))
     priority = torch.from_numpy(priority)
 
     # Generate the first tensor

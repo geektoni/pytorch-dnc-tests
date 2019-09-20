@@ -54,10 +54,11 @@ if __name__ == "__main__":
     parser.add_argument('-curriculum_freq', type=int, default=1000, metavar='N',
                         help='sequence_max_length incrementor per 1K iterations')
     parser.add_argument('-cuda', type=int, default=-1, help='Cuda GPU ID, -1 for CPU')
+    parser.add_argument('-seed', type=int, default=42, help='Random Number Generator seed.')
 
     parser.add_argument('-iterations', type=int, default=1000000, metavar='N', help='total number of iteration')
     parser.add_argument('-summarize_freq', type=int, default=100, metavar='N', help='summarize frequency')
-    parser.add_argument('-check_freq', type=int, default=100000, metavar='N', help='check point frequency')
+    parser.add_argument('-check_freq', type=int, default=5000, metavar='N', help='check point frequency')
     parser.add_argument('-visdom', action='store_true', help='plot memory content on visdom per -summarize_freq steps')
     parser.add_argument('-non_uniform_priority', action="store_true", help='Draw the priority value from the beta distribution')
 
@@ -83,8 +84,8 @@ if __name__ == "__main__":
     configure(args.tb_dir+"/"+experiment_name)
 
     # Set the random seed used
-    np.random.seed(42)
-    T.manual_seed(42)
+    np.random.seed(args.seed)
+    T.manual_seed(args.seed)
 
     # Enable visdom if we need it
     if args.visdom:
