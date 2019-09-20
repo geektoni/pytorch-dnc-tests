@@ -7,4 +7,4 @@
 #PBS -V
 #PBS -m be
 
-~/master/priority_sort_task/priority_sort_task.py -lr=1.000e-04 -mem_size=20 -mem_slot=128 -sequence_max_length=${elements}
+~/master/priority_sort_task/priority_sort_task.py -lr=1.000e-04 -mem_size=20 -mem_slot=128 -sequence_max_length=${elements} -non_uniform_priority
