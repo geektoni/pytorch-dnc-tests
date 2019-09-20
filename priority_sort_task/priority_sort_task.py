@@ -385,7 +385,7 @@ if __name__ == "__main__":
             if take_checkpoint:
 
                 check_ptr = os.path.join(ckpts_dir, "model_"+experiment_name+".pt.{}".format(epoch))
-                llprint("\n[*] Saving Checkpoint to {}\n".format(check_ptr))
+                llprint("\n[*] Saving Checkpoint to {}\n".format(ckpts_dir))
                 cur_weights = rnn.state_dict()
                 T.save(cur_weights, check_ptr)
 
