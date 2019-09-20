@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument('-memory_type', type=str, default='dnc', help='dense or sparse memory: dnc | sdnc | sam')
     parser.add_argument('-tb_dir', type=str, default='./tensorboard', help='tensorboard log directory')
 
-    parser.add_argument('-steps', type=int, default=1, help="Number of steps we give to the DNC")
+    parser.add_argument('-steps', type=int, default=0, help="Number of steps we give to the DNC")
     parser.add_argument('-checkpoint_dir', type=str, default='checkpoints', help="Name of the directory where we will save the checkpoints")
     parser.add_argument('-independent_linears', action='store_true', help="Use independent linears for the memory management")
 
@@ -48,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('-sparse_reads', type=int, default=10, help='number of sparse reads per read head')
     parser.add_argument('-temporal_reads', type=int, default=2, help='number of temporal reads')
 
-    parser.add_argument('-sequence_max_length', type=int, default=20, metavar='N', help='sequence_max_length')
+    parser.add_argument('-sequence_max_length', type=int, default=8, metavar='N', help='sequence_max_length')
     parser.add_argument('-curriculum_increment', type=int, default=0, metavar='N',
                         help='sequence_max_length incrementor per 1K iterations')
     parser.add_argument('-curriculum_freq', type=int, default=1000, metavar='N',

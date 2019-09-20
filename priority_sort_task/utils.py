@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 from dnc.dnc import DNC
 
@@ -170,22 +171,36 @@ def generate_result_images(prediction, target, read_w, write_w, image_dir, exper
     output, (chx, mhx, rv), v = rnn(x, (None, mhx, None), reset_experience=True, pass_through_memory=True)
 
     # This is needed if we want to use make_eval_plot
-    if args.steps == 1:
-        prediction = output[:, :-1, :-3]
-        target = y[:,:,:-3]
+    if args.steps == 0:
+        prediction = output[:, :-1, :-3].detach().numpy()[0]
+        target = y[:,:,:-3].detach().numpy()[0]
     else:
-        prediction = output[:, ((sequence_length + 1) + args.steps+1):, :-3]
-        target = y[:,:,:-3]
+        prediction = output[:, ((args.sequence_max_length + 1) + args.steps+1):, :-3].detach().numpy()[0]
+        target = y[:,:,:-3].detach().numpy()[0]
 
-    fig = plt.figure(figsize=(10,10))
-    ax1 = fig.add_subplot(211)
-    ax2 = fig.add_subplot(212)
+    fig = plt.figure(figsize=(5,5))
+    ax1 = fig.add_subplot(221)
+    ax2 = fig.add_subplot(222)
+    ax3 = fig.add_subplot(223)
+    ax4 = fig.add_subplot(222)
 
     ax1.set_title("Result")
     ax2.set_title("Target")
+    ax3.set_title("Input")
 
-    sns.heatmap(prediction.detach().numpy()[0], ax=ax1, vmin=0, vmax=1, linewidths=.5, cbar=True)
-    sns.heatmap(target.detach().numpy()[0], ax=ax2, vmin=0, vmax=1, linewidths=.5, cbar=True)
+    x = x.detach().numpy()[0]
+    prediction = np.swapaxes(prediction, 0, 1)
+    target = np.swapaxes(target, 0, 1)
+    x = np.swapaxes(x, 0, 1)
+
+    prediction_bin = []
+    for t in prediction:
+        prediction_bin.append((t>0.5))
+    prediction = T.from_numpy(np.array(prediction_bin))
+
+    sns.heatmap(prediction, ax=ax1, vmin=0, vmax=1, linewidths=.5, linecolor="black", cmap="Greys", cbar=True)
+    sns.heatmap(target, ax=ax2, vmin=0, vmax=1, linewidths=.5, linecolor="black", cmap="Greys", cbar=True)
+    sns.heatmap(x, ax=ax3, vmin=0, vmax=1, linewidths=.5, linecolor="black", cmap="Greys", cbar=True)
 
     plt.tight_layout()
     plt.savefig(image_dir+"/result_"+experiment_name+"_{}.png".format(epoch), dpi=250)
