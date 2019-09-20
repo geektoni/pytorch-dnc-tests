@@ -409,4 +409,9 @@ if __name__ == "__main__":
                 f.write(json.dumps(content))
                 f.close()
 
+                # Save complete params
+                f = open(os.path.join(ckpts_dir, "config_"+experiment_name+"_{}.txt".format(epoch)), 'w+')
+                f.write(str(args))
+                f.close()
+
                 llprint("Check point done!\n")
