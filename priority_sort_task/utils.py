@@ -6,6 +6,11 @@ import torch
 import torch as T
 import torch.nn.functional as F
 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from dnc.dnc import DNC
+
 def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
@@ -140,3 +145,59 @@ def compute_cost(output, target_out, batch_size=1):
     cost = torch.sum(torch.abs(y_out_binarized.cpu().float() - target_output.cpu().float()))/batch_size
 
     return cost
+
+def generate_result_images(prediction, target, read_w, write_w, image_dir, experiment_name, epoch, args, model_path):
+
+    x, y = generate_data(1, args.sequence_max_length, args.input_size+3, steps=args.steps, non_uniform=False)
+
+    rnn = DNC(
+        input_size=args.input_size+3,
+        hidden_size=args.nhid,
+        rnn_type=args.rnn_type,
+        num_layers=args.nlayer,
+        num_hidden_layers=args.nhlayer,
+        dropout=args.dropout,
+        nr_cells=args.mem_slot,
+        cell_size=args.mem_size,
+        read_heads=args.read_heads,
+        gpu_id=args.cuda,
+        debug=True,
+        batch_first=True,
+        independent_linears=args.independent_linears)
+    rnn.load_state_dict(torch.load(model_path))
+
+    (chx, mhx, rv) = (None, None, None)
+    output, (chx, mhx, rv), v = rnn(x, (None, mhx, None), reset_experience=True, pass_through_memory=True)
+
+    # This is needed if we want to use make_eval_plot
+    if args.steps == 1:
+        prediction = output[:, :-1, :-3]
+        target = y[:,:,:-3]
+    else:
+        prediction = output[:, ((sequence_length + 1) + args.steps+1):, :-3]
+        target = y[:,:,:-3]
+
+    fig = plt.figure(figsize=(10,10))
+    ax1 = fig.add_subplot(211)
+    ax2 = fig.add_subplot(212)
+
+    ax1.set_title("Result")
+    ax2.set_title("Target")
+
+    sns.heatmap(prediction.detach().numpy()[0], ax=ax1, vmin=0, vmax=1, linewidths=.5, cbar=True)
+    sns.heatmap(target.detach().numpy()[0], ax=ax2, vmin=0, vmax=1, linewidths=.5, cbar=True)
+
+    plt.tight_layout()
+    plt.savefig(image_dir+"/result_"+experiment_name+"_{}.png".format(epoch), dpi=250)
+
+    fig = plt.figure(figsize=(15,6))
+    ax1_2 = fig.add_subplot(211)
+    ax2_2 = fig.add_subplot(212)
+    ax1_2.set_title("Read Weigths")
+    ax2_2.set_title("Write Weights")
+
+    sns.heatmap(read_w, ax=ax1_2, linewidths=.01)
+    sns.heatmap(write_w, ax=ax2_2, linewidths=.01)
+
+    plt.tight_layout()
+    plt.savefig(image_dir+"/weights_"+experiment_name+"_{}.png".format(epoch), dpi=250)

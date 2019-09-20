@@ -16,6 +16,10 @@ from dnc.util import *
 import torch.autograd as autograd
 import torch.optim as optim
 
+from tensorboard_logger import configure, log_value
+import seaborn as sns
+from tqdm import tqdm
+
 if __name__ == "__main__":
 
     # Set the arg parser
@@ -25,6 +29,7 @@ if __name__ == "__main__":
     parser.add_argument('-nhid', type=int, default=100, help='number of hidden units of the inner nn')
     parser.add_argument('-dropout', type=float, default=0, help='controller dropout')
     parser.add_argument('-memory_type', type=str, default='dnc', help='dense or sparse memory: dnc | sdnc | sam')
+    parser.add_argument('-tb_dir', type=str, default='./tensorboard', help='tensorboard log directory')
 
     parser.add_argument('-steps', type=int, default=1, help="Number of steps we give to the DNC")
     parser.add_argument('-checkpoint_dir', type=str, default='checkpoints', help="Name of the directory where we will save the checkpoints")
@@ -59,6 +64,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
+    # Generate the name of this experiment
+    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
+        args.input_size,
+        args.rnn_type,
+        args.nhid,
+        args.memory_type,
+        args.steps,
+        args.batch_size,
+        args.mem_size,
+        args.mem_slot,
+        args.sequence_max_length,
+        args.iterations,
+        args.non_uniform_priority
+    )
+
+    # Add directory were to save the tensorboard logs
+    configure(args.tb_dir+"/"+experiment_name)
+
     # Set the random seed used
     np.random.seed(42)
     T.manual_seed(42)
@@ -69,9 +92,10 @@ if __name__ == "__main__":
 
     # Setup the directory were we will save the checkpoints
     dirname = os.path.dirname(".")
-    ckpts_dir = os.path.join(dirname, args.checkpoint_dir)
+    ckpts_dir = os.path.join(dirname, args.checkpoint_dir)+"/"+experiment_name
     if not os.path.isdir(ckpts_dir):
-        os.mkdir(ckpts_dir)
+        os.makedirs(ckpts_dir)
+        os.makedirs(ckpts_dir+"/images")
 
     # Setup basic informations
     batch_size = args.batch_size
@@ -101,7 +125,7 @@ if __name__ == "__main__":
         cell_size=mem_size,
         read_heads=read_heads,
         gpu_id=args.cuda,
-        debug=args.visdom,
+        debug=True,
         batch_first=True,
         independent_linears=independent_linears
     )
@@ -168,15 +192,13 @@ if __name__ == "__main__":
     last_costs = []
     last_losses = []
     save_losses= []
-    seq_lengths = []
 
     # Create the loss object
     bce_loss = nn.BCELoss(reduction='mean')
     sigm = nn.Sigmoid()
 
     (chx, mhx, rv) = (None, None, None)
-    for epoch in range(iterations + 1):
-        llprint("\r[*] Iteration {ep}/{tot}".format(ep=epoch, tot=iterations))
+    for epoch in tqdm(range(iterations)):
         optimizer.zero_grad()
 
         #random_length = np.random.randint(1, sequence_max_length + 1)
@@ -208,7 +230,7 @@ if __name__ == "__main__":
             optimizer.step()
             loss_value = loss.item()
 
-            summarize = (epoch % summarize_freq == 0)
+            summarize = (epoch % summarize_freq == 0) and (epoch != 0)
             take_checkpoint = (epoch != 0) and (epoch % check_freq == 0)
 
             # Increment size just if we have set a curriculum frequency
@@ -231,157 +253,157 @@ if __name__ == "__main__":
             costs.append(current_cost)
             last_costs.append(current_cost)
 
-            # Save sequence length
-            seq_lengths.append(args.input_size)
+            if summarize:
+                llprint("\n\t[*] Iteration {ep}/{tot}".format(ep=epoch, tot=iterations))
+                loss = np.mean(last_losses)
+                cost = np.mean(last_costs)
+                last_losses = []
+                last_costs = []
+                llprint("\n\t[*] Avg. Logistic Loss: %.4f" % (loss))
+                llprint("\n\t[*] Avg. Cost: %4f\n"% (cost))
+                if np.isnan(loss):
+                    raise Exception('We computed a NaN Loss')
 
-        if summarize:
-            loss = np.mean(last_losses)
-            cost = np.mean(last_costs)
-            last_losses = []
-            last_costs = []
-            llprint("\n\t[*] Avg. Logistic Loss: %.4f" % (loss))
-            llprint("\n\t[*] Avg. Cost: %4f\n"% (cost))
-            if np.isnan(loss):
-                raise Exception('We computed a NaN Loss')
+            if summarize and rnn.debug:
+                loss = np.mean(last_losses)
+                last_losses = []
+                last_costs = []
 
-        if summarize and rnn.debug:
-            loss = np.mean(last_losses)
-            last_losses = []
-            last_costs = []
-
-        if args.visdom:
-            if args.memory_type == 'dnc':
-                viz.heatmap(
-                    v['memory'],
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Memory, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='layer * time',
-                        xlabel='mem_slot * mem_size'
+            if args.visdom:
+                if args.memory_type == 'dnc':
+                    viz.heatmap(
+                        v['memory'],
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Memory, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='layer * time',
+                            xlabel='mem_slot * mem_size'
+                        )
                     )
-                )
 
-            if args.memory_type == 'dnc':
-                viz.heatmap(
-                    v['link_matrix'][-1].reshape(args.mem_slot, args.mem_slot),
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='mem_slot',
-                        xlabel='mem_slot'
+                if args.memory_type == 'dnc':
+                    viz.heatmap(
+                        v['link_matrix'][-1].reshape(args.mem_slot, args.mem_slot),
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='mem_slot',
+                            xlabel='mem_slot'
+                        )
                     )
-                )
-            elif args.memory_type == 'sdnc':
-                viz.heatmap(
-                    v['link_matrix'][-1].reshape(args.mem_slot, -1),
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='mem_slot',
-                        xlabel='mem_slot'
+                elif args.memory_type == 'sdnc':
+                    viz.heatmap(
+                        v['link_matrix'][-1].reshape(args.mem_slot, -1),
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='mem_slot',
+                            xlabel='mem_slot'
+                        )
                     )
-                )
 
-                viz.heatmap(
-                    v['rev_link_matrix'][-1].reshape(args.mem_slot, -1),
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Reverse Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='mem_slot',
-                        xlabel='mem_slot'
+                    viz.heatmap(
+                        v['rev_link_matrix'][-1].reshape(args.mem_slot, -1),
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Reverse Link Matrix, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='mem_slot',
+                            xlabel='mem_slot'
+                        )
                     )
-                )
 
-            elif args.memory_type == 'sdnc' or args.memory_type == 'dnc':
-                viz.heatmap(
-                    v['precedence'],
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Precedence, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='layer * time',
-                        xlabel='mem_slot'
+                elif args.memory_type == 'sdnc' or args.memory_type == 'dnc':
+                    viz.heatmap(
+                        v['precedence'],
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Precedence, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='layer * time',
+                            xlabel='mem_slot'
+                        )
                     )
-                )
 
-            if args.memory_type == 'sdnc':
-                viz.heatmap(
-                    v['read_positions'],
-                    opts=dict(
-                        xtickstep=10,
-                        ytickstep=2,
-                        title='Read Positions, t: ' + str(epoch) + ', loss: ' + str(loss),
-                        ylabel='layer * time',
-                        xlabel='mem_slot'
+                if args.memory_type == 'sdnc':
+                    viz.heatmap(
+                        v['read_positions'],
+                        opts=dict(
+                            xtickstep=10,
+                            ytickstep=2,
+                            title='Read Positions, t: ' + str(epoch) + ', loss: ' + str(loss),
+                            ylabel='layer * time',
+                            xlabel='mem_slot'
+                        )
                     )
-                )
 
-                viz.heatmap(
-                  v['read_weights'],
-                  opts=dict(
-                      xtickstep=10,
-                      ytickstep=2,
-                      title='Read Weights, t: ' + str(epoch) + ', loss: ' + str(loss),
-                      ylabel='layer * time',
-                      xlabel='nr_read_heads * mem_slot'
+                    viz.heatmap(
+                      v['read_weights'],
+                      opts=dict(
+                          xtickstep=10,
+                          ytickstep=2,
+                          title='Read Weights, t: ' + str(epoch) + ', loss: ' + str(loss),
+                          ylabel='layer * time',
+                          xlabel='nr_read_heads * mem_slot'
+                      )
                   )
-              )
 
-                viz.heatmap(
-                  v['write_weights'],
-                  opts=dict(
-                      xtickstep=10,
-                      ytickstep=2,
-                      title='Write Weights, t: ' + str(epoch) + ', loss: ' + str(loss),
-                      ylabel='layer * time',
-                      xlabel='mem_slot'
+                    viz.heatmap(
+                      v['write_weights'],
+                      opts=dict(
+                          xtickstep=10,
+                          ytickstep=2,
+                          title='Write Weights, t: ' + str(epoch) + ', loss: ' + str(loss),
+                          ylabel='layer * time',
+                          xlabel='mem_slot'
+                      )
                   )
-              )
 
-                viz.heatmap(
-                  v['usage_vector'] if args.memory_type == 'dnc' else v['usage'],
-                  opts=dict(
-                      xtickstep=10,
-                      ytickstep=2,
-                      title='Usage Vector, t: ' + str(epoch) + ', loss: ' + str(loss),
-                      ylabel='layer * time',
-                      xlabel='mem_slot'
+                    viz.heatmap(
+                      v['usage_vector'] if args.memory_type == 'dnc' else v['usage'],
+                      opts=dict(
+                          xtickstep=10,
+                          ytickstep=2,
+                          title='Usage Vector, t: ' + str(epoch) + ', loss: ' + str(loss),
+                          ylabel='layer * time',
+                          xlabel='mem_slot'
+                      )
                   )
-              )
 
-        # Increment the size of the input
-        if increment_curriculum:
-            sequence_max_length = sequence_max_length + args.curriculum_increment
-            llprint("\n[*] Increasing max length to " + str(sequence_max_length)+"\n")
+            # Increment the size of the input
+            if increment_curriculum:
+                sequence_max_length = sequence_max_length + args.curriculum_increment
+                llprint("\n[*] Increasing max length to " + str(sequence_max_length)+"\n")
 
-        # Take a checkpoint, save the model and the data
-        if take_checkpoint:
-            check_ptr = os.path.join(ckpts_dir, 'model_{}_{}_{}_{}_{}.pth'.format(batch_size,
-                                                                                    random_length,
-                                                                                    args.input_size+3,
-                                                                                    args.steps,
-                                                                                    epoch))
-            llprint("\n[*] Saving Checkpoint to {}\n".format(check_ptr))
-            cur_weights = rnn.state_dict()
-            T.save(cur_weights, check_ptr)
+            # Take a checkpoint, save the model and the data
+            if take_checkpoint:
 
-            # Save data
-            performance_data_path = os.path.join(ckpts_dir, 'results_{}_{}_{}_{}_{}.json'.format(batch_size,
-                                                                                              random_length,
-                                                                                              args.input_size+3,
-                                                                                              args.steps,
-                                                                                              epoch))
-            content = {
-              "loss": save_losses,
-              "cost": costs,
-              "seq_lengths": seq_lengths
-            }
-            f = open(performance_data_path, 'w+')
-            f.write(json.dumps(content))
-            f.close()
+                check_ptr = os.path.join(ckpts_dir, "model_"+experiment_name+".pt.{}".format(epoch))
+                llprint("\n[*] Saving Checkpoint to {}\n".format(check_ptr))
+                cur_weights = rnn.state_dict()
+                T.save(cur_weights, check_ptr)
 
-            llprint("Check point done!\n")
+                # Generate images
+                generate_result_images(
+                    sigm(output).detach().numpy(),target_output.detach().numpy(),
+                    v['read_weights'],v['write_weights'],
+                    ckpts_dir+"/images",
+                    experiment_name,
+                    epoch,
+                    args,
+                    check_ptr)
+
+                # Save data
+                performance_data_path = os.path.join(ckpts_dir, "results_"+experiment_name+"_{}.json".format(epoch))
+                content = {
+                  "loss": save_losses,
+                  "cost": costs
+                }
+                f = open(performance_data_path, 'w+')
+                f.write(json.dumps(content))
+                f.close()
+
+                llprint("Check point done!\n")
