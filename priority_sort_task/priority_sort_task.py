@@ -257,6 +257,8 @@ if __name__ == "__main__":
                 llprint("\n\t[*] Iteration {ep}/{tot}".format(ep=epoch, tot=iterations))
                 loss = np.mean(last_losses)
                 cost = np.mean(last_costs)
+                log_value('train_loss', loss, epoch)
+                log_value('bit_error_per_sequence', cost, epoch)
                 last_losses = []
                 last_costs = []
                 llprint("\n\t[*] Avg. Logistic Loss: %.4f" % (loss))
