@@ -189,10 +189,8 @@ if __name__ == "__main__":
 
 
     # List for keeping useful data
-    costs = []
     last_costs = []
     last_losses = []
-    save_losses= []
 
     # Create the loss object
     bce_loss = nn.BCELoss(reduction='mean')
@@ -220,10 +218,7 @@ if __name__ == "__main__":
             # We compute the loss by taking into account only the vectors and not
             # the delimiter bit or the priority. This has to be done in order to
             # have a negative loss.
-            if args.steps == 0:
-                loss = bce_loss(sigm(output[:, :-1, :-3]), target_output[:,:,:-3])
-            else:
-                loss = bce_loss(sigm(output[:, ((random_length+1)+args.steps+1):, :-3]), target_output[:,:,:-3])
+            loss = bce_loss(sigm(output[:, -random_length:, :-3]), target_output[:,:,:-3])
 
             loss.backward()
 
@@ -243,15 +238,10 @@ if __name__ == "__main__":
             mhx = { k : v.detach() for k, v in mhx.items() }
 
             # Save loss value
-            save_losses.append(loss_value)
             last_losses.append(loss_value)
 
             # Save cost value
-            if args.steps==0:
-                current_cost = compute_cost(sigm(output[:, :-1, :-3]), target_output[:,:,:-3], batch_size=batch_size).item()
-            else:
-                current_cost = compute_cost(sigm(output[:, ((random_length+1)+args.steps+1):, :-3]), target_output[:, :, :-3], batch_size=batch_size).item()
-            costs.append(current_cost)
+            current_cost = compute_cost(sigm(output[:, -random_length:, :-3]), target_output[:,:,:-3], batch_size=batch_size).item()
             last_costs.append(current_cost)
 
             if summarize:
@@ -398,16 +388,6 @@ if __name__ == "__main__":
                     epoch,
                     args,
                     check_ptr)
-
-                # Save data
-                performance_data_path = os.path.join(ckpts_dir, "results_"+experiment_name+"_{}.json".format(epoch))
-                content = {
-                  "loss": save_losses,
-                  "cost": costs
-                }
-                f = open(performance_data_path, 'w+')
-                f.write(json.dumps(content))
-                f.close()
 
                 # Save complete params
                 f = open(os.path.join(ckpts_dir, "config_"+experiment_name+"_{}.txt".format(epoch)), 'w+')

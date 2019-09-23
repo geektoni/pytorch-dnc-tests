@@ -67,9 +67,9 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
 
     # We then add an empty section in which we need to store the result
     # only if the steps are greater than 1
-    if steps > 0:
-        inp_tmp = torch.zeros(batch_size, (length), size)
-        inp = torch.cat((inp, inp_tmp), 1)
+    #if steps > 0:
+    inp_tmp = torch.zeros(batch_size, (length), size)
+    inp = torch.cat((inp, inp_tmp), 1)
 
     outp = inp.numpy()
 
@@ -173,18 +173,14 @@ def generate_result_images(prediction, target, read_w, write_w, image_dir, exper
     output, (chx, mhx, rv), v = rnn(x, (None, mhx, None), reset_experience=True, pass_through_memory=True)
 
     # This is needed if we want to use make_eval_plot
-    if args.steps == 0:
-        prediction = output[:, :-1, :-3].detach().numpy()[0]
-        target = y[:,:,:-3].detach().numpy()[0]
-    else:
-        prediction = output[:, ((args.sequence_max_length + 1) + args.steps+1):, :-3].detach().numpy()[0]
-        target = y[:,:,:-3].detach().numpy()[0]
+    sigm = T.nn.Sigmoid()
+    prediction = sigm(output[:, -args.sequence_max_length:, :-3]).detach().numpy()[0]
+    target = y[:,:,:-3].detach().numpy()[0]
 
     fig = plt.figure(figsize=(5,5))
     ax1 = fig.add_subplot(221)
     ax2 = fig.add_subplot(222)
-    ax3 = fig.add_subplot(223)
-    ax4 = fig.add_subplot(222)
+    ax3 = fig.add_subplot(212)
 
     ax1.set_title("Result")
     ax2.set_title("Target")
