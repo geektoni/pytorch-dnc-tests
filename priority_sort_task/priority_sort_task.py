@@ -207,7 +207,14 @@ if __name__ == "__main__":
 
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
-        input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+        if args.mixture:
+            input_data, target_output = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+            for i in range(1, batch_size):
+                input_data_tmp, target_output_tmp = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+                input_data = torch.cat((input_data, input_data_tmp), 0)
+                target_output = torch.cat((target_output, target_output_tmp),0)
+        else:
+            input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
 
         with autograd.detect_anomaly():
 
