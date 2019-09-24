@@ -12,11 +12,13 @@ from matplotlib.colors import ListedColormap
 
 from dnc.dnc import DNC
 
+from generators.generators import PriorityGenerator
+
 def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
 
-def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False):
+def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False, ordered=False, mixture=False):
 
     # Generate the binary sequences of length equal to size.
     # We leave 2 bits empty for the priority and the delimiter.
@@ -27,12 +29,13 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
 
     # Add priority number (just a single one drawn from the uniform distribution
     # or from the beta distribution)
-    if not non_uniform:
-        priority = np.random.uniform(-1, 1, (batch_size, length, 1))
-    else:
-        alpha = np.random.uniform(1, 100)
-        beta = np.random.uniform(1, 100)
-        priority = np.random.beta(alpha, beta, (batch_size, length, 1))
+    pg = PriorityGenerator(batch_size, length)
+    priority = pg.sample(non_uniform, mixture)
+
+    # Generate already ordered priority
+    if ordered:
+        priority = -np.sort(-priority, axis=1)
+
     priority = torch.from_numpy(priority)
 
     # Generate the first tensor
@@ -81,7 +84,8 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False)
         temp = []
         for i in range(length):
             temp.append(outp[b][i])
-        temp.sort(key=lambda x: x[size-3], reverse=True)  # Sort elements descending order
+        if not ordered:
+            temp.sort(key=lambda x: x[size-3], reverse=True)  # Sort elements descending order
         temp_total.append(temp)
 
     # FIXME
