@@ -61,6 +61,8 @@ if __name__ == "__main__":
     parser.add_argument('-check_freq', type=int, default=5000, metavar='N', help='check point frequency')
     parser.add_argument('-visdom', action='store_true', help='plot memory content on visdom per -summarize_freq steps')
     parser.add_argument('-non_uniform_priority', action="store_true", help='Draw the priority value from the beta distribution')
+    parser.add_argument('-mixture', action="store_true", help='Draw the priority value from the beta distribution')
+
 
     args = parser.parse_args()
     print(args)
@@ -205,7 +207,7 @@ if __name__ == "__main__":
 
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
-        input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority)
+        input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
 
         with autograd.detect_anomaly():
 

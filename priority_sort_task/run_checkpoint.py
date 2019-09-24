@@ -34,6 +34,9 @@ parser.add_argument('--seed', type=int, default=42, help="Seed used for the rand
 # Parse the arguments
 args = parser.parse_args()
 
+# Set the seed
+np.random.seed(int(args.seed))
+
 # Get the information from the model. The configs are the following:
 configs = os.path.basename(args.model).split("_")
 sequence_num_of_bits = int(configs[3])
