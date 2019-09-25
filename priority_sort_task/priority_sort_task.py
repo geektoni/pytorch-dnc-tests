@@ -20,6 +20,8 @@ from tensorboard_logger import configure, log_value
 import seaborn as sns
 from tqdm import tqdm
 
+from datetime import datetime
+
 if __name__ == "__main__":
 
     # Set the arg parser
@@ -67,8 +69,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
+    date = datetime.now()
+    timestamp = date.strftime("%d%m%Y%H%M%S")
+
     # Generate the name of this experiment
-    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
+    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
         args.input_size,
         args.rnn_type,
         args.nhid,
@@ -79,7 +84,11 @@ if __name__ == "__main__":
         args.mem_slot,
         args.sequence_max_length,
         args.iterations,
-        args.non_uniform_priority
+        args.non_uniform_priority,
+        args.mixture,
+        args.curriculum_increment,
+        args.curriculum_freq,
+        timestamp
     )
 
     # Add directory were to save the tensorboard logs
