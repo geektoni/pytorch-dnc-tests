@@ -64,6 +64,7 @@ if __name__ == "__main__":
     parser.add_argument('-visdom', action='store_true', help='plot memory content on visdom per -summarize_freq steps')
     parser.add_argument('-non_uniform_priority', action="store_true", help='Draw the priority value from the beta distribution')
     parser.add_argument('-mixture', action="store_true", help='Draw the priority value from the beta distribution')
+    parser.add_argument('-model', type=str, default="", help='Model checkpoint used to perform the tests.')
 
 
     args = parser.parse_args()
@@ -179,6 +180,9 @@ if __name__ == "__main__":
     else:
         raise Exception('Not recognized type of memory')
 
+    if args.model != "":
+        rnn.load_state_dict(torch.load(args.model))
+
     # Print the structure of the rnn
     print(rnn)
 
@@ -217,13 +221,13 @@ if __name__ == "__main__":
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
         if args.mixture:
-            input_data, target_output = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+            input_data, target_output, _ = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
             for i in range(1, batch_size):
-                input_data_tmp, target_output_tmp = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+                input_data_tmp, target_output_tmp, _ = generate_data(1, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
                 input_data = torch.cat((input_data, input_data_tmp), 0)
                 target_output = torch.cat((target_output, target_output_tmp),0)
         else:
-            input_data, target_output = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
+            input_data, target_output, _ = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
 
         with autograd.detect_anomaly():
 
@@ -400,7 +404,6 @@ if __name__ == "__main__":
                 # Generate images
                 generate_result_images(
                     sigm(output).detach().numpy(),target_output.detach().numpy(),
-                    v['read_weights'],v['write_weights'],
                     ckpts_dir+"/images",
                     experiment_name,
                     epoch,

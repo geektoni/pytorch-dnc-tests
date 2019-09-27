@@ -108,7 +108,7 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False,
         inp = inp.cuda()
         outp = outp.cuda()
 
-    return inp.float(), outp.float()[:, :-1, :]
+    return inp.float(), outp.float()[:, :-1, :], priority
 
 def criterion(predictions, targets):
     return T.mean(
@@ -153,9 +153,12 @@ def compute_cost(output, target_out, batch_size=1):
 
     return cost
 
-def generate_result_images(prediction, target, read_w, write_w, image_dir, experiment_name, epoch, args, model_path):
+def generate_result_images(prediction, target, image_dir, experiment_name, epoch, args, model_path):
 
-    x, y = generate_data(1, args.sequence_max_length, args.input_size+3, steps=args.steps, non_uniform=False)
+    x, y, priority = generate_data(1, args.sequence_max_length, args.input_size+3, steps=args.steps, non_uniform=False)
+
+    print(priority.detach().numpy())
+    print(np.argsort(-priority.detach().numpy(), axis=1))
 
     rnn = DNC(
         input_size=args.input_size+3,
@@ -207,14 +210,28 @@ def generate_result_images(prediction, target, read_w, write_w, image_dir, exper
     plt.tight_layout()
     plt.savefig(image_dir+"/result_"+experiment_name+"_{}.png".format(epoch), dpi=250)
 
-    fig = plt.figure(figsize=(15,6))
-    ax1_2 = fig.add_subplot(211)
-    ax2_2 = fig.add_subplot(212)
+    #fig = plt.figure(figsize=(15,10))
+    fig = plt.figure()
+    ax1_2 = fig.add_subplot(321)
+    ax2_2 = fig.add_subplot(325)
+    ax3_2 = fig.add_subplot(322)
+    ax4_2 = fig.add_subplot(324)
+    ax5_2 = fig.add_subplot(326)
+    ax6_2 = fig.add_subplot(323)
     ax1_2.set_title("Read Weigths")
     ax2_2.set_title("Write Weights")
+    ax3_2.set_title("Forward Mode")
+    ax4_2.set_title("Content Mode")
+    ax5_2.set_title("Backward Mode")
+    ax6_2.set_title("Read Modes")
+    ax6_2.set_yticklabels(["back", "forw", "cont"])
 
-    sns.heatmap(read_w, ax=ax1_2, linewidths=.01)
-    sns.heatmap(write_w, ax=ax2_2, linewidths=.01)
+    sns.heatmap(v['read_weights'].T, ax=ax1_2, linewidths=.01)
+    sns.heatmap(v['write_weights'].T, ax=ax2_2, linewidths=.01)
+    sns.heatmap(v['forward_mode'].T, ax=ax3_2, linewidths=.01)
+    sns.heatmap(v['content_mode'].T, ax=ax4_2, linewidths=.01)
+    sns.heatmap(v['backward_mode'].T, ax=ax5_2, linewidths=.01)
+    sns.heatmap(v['read_modes'].T, ax=ax6_2, linewidths=.01)
 
     plt.tight_layout()
     plt.savefig(image_dir+"/weights_"+experiment_name+"_{}.png".format(epoch), dpi=250)
