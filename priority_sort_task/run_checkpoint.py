@@ -49,7 +49,7 @@ mem_size = int(configs[9])
 mem_slot = int(configs[10])
 sequence_length = int(configs[11])
 iterations = int(configs[12])
-non_uniform_priority = bool(configs[13].split(".")[0])
+non_uniform_priority = bool(configs[13])
 
 # Generate the model
 rnn = DNC(input_size=sequence_num_of_bits+3,
@@ -60,7 +60,7 @@ rnn = DNC(input_size=sequence_num_of_bits+3,
         dropout=0,
         nr_cells=mem_slot,
         cell_size=mem_size,
-        read_heads=5,
+        read_heads=1,
         gpu_id=-1,
         debug=True,
         batch_first=True,
@@ -78,24 +78,26 @@ total_costs = pd.DataFrame(columns=["non_uniform_not_ordered",
 # Execute the evaluation
 sigm = T.nn.Sigmoid()
 
+sequence_length = sequence_length//2
+
 for i in tqdm(range(0, args.iterations)):
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=True, ordered=False)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=True, ordered=False)
     a = execute(rnn, x, y)
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=True, ordered=True)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=True, ordered=True)
     b = execute(rnn, x, y)
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=False)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=False)
     c = execute(rnn, x, y)
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=True)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=True)
     d = execute(rnn, x, y)
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=True, mixture=True)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=True, mixture=True)
     e = execute(rnn, x, y)
 
-    x, y = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=False, mixture=True)
+    x, y, _ = generate_data(1, sequence_length, sequence_num_of_bits+3, steps=steps, non_uniform=False, ordered=False, mixture=True)
     f = execute(rnn, x, y)
 
     total_costs=total_costs.append(
