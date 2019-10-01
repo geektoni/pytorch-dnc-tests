@@ -65,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument('-non_uniform_priority', action="store_true", help='Draw the priority value from the beta distribution')
     parser.add_argument('-mixture', action="store_true", help='Draw the priority value from the beta distribution')
     parser.add_argument('-model', type=str, default="", help='Model checkpoint used to perform the tests.')
-
+    parser.add_argument('-random_length_sequence', action="store_true", help='Employ random length sequences to train the model.')
 
     args = parser.parse_args()
     print(args)
@@ -87,6 +87,7 @@ if __name__ == "__main__":
         args.iterations,
         args.non_uniform_priority,
         args.mixture,
+        args.random_length_sequence,
         args.curriculum_increment,
         args.curriculum_freq,
         timestamp
@@ -215,8 +216,10 @@ if __name__ == "__main__":
     for epoch in tqdm(range(iterations)):
         optimizer.zero_grad()
 
-        #random_length = np.random.randint(1, sequence_max_length + 1)
-        random_length=sequence_max_length
+        if args.random_length_sequence:
+            random_length = np.random.randint(2, sequence_max_length + 1)
+        else:
+            random_length = sequence_max_length
 
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
