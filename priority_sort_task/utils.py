@@ -18,7 +18,7 @@ def llprint(message):
     sys.stdout.write(message)
     sys.stdout.flush()
 
-def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False, ordered=False, mixture=False):
+def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False, ordered=False, mixture=False, even=False):
 
     # Generate the binary sequences of length equal to size.
     # We leave 2 bits empty for the priority and the delimiter.
@@ -32,11 +32,18 @@ def generate_data(batch_size, length, size, steps=0, cuda=-1, non_uniform=False,
     pg = PriorityGenerator(batch_size, length)
     priority = pg.sample(non_uniform, mixture)
 
+    # Generate an even priority
+    if even:
+        priority = torch.linspace(-1, 1, length, out=torch.zeros([batch_size, length, 1]))
+        r=torch.randperm(length)
+        priority = priority[:, r, :]
+
     # Generate already ordered priority
     if ordered:
         priority = -np.sort(-priority, axis=1)
 
-    priority = torch.from_numpy(priority)
+    if not even:
+        priority = torch.from_numpy(priority)
 
     # Generate the first tensor
     inp = torch.zeros(batch_size, (length + 1), size)
