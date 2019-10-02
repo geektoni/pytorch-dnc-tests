@@ -217,7 +217,7 @@ if __name__ == "__main__":
         optimizer.zero_grad()
 
         if args.random_length_sequence:
-            random_length = np.random.randint(2, sequence_max_length//2)
+            random_length = np.random.randint(2, sequence_max_length//2+1)
         else:
             random_length = sequence_max_length
 
