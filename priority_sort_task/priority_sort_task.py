@@ -70,6 +70,8 @@ if __name__ == "__main__":
     parser.add_argument('-compute_memory_loss', type=float, default=0, metavar='N', help='Weighting over computing also the memory loss.')
     parser.add_argument('-compute_output_loss', type=float, default=1, metavar='N', help='Weighting over computing also the output loss.')
 
+    parser.add_argument('-initialize_memory', action="store_true", help='Initialize the memory with the input')
+
     args = parser.parse_args()
     print(args)
 
@@ -219,23 +221,21 @@ if __name__ == "__main__":
     # is not useful to store the read vectors
     chx, mhx, rv = rnn._init_hidden(None, batch_size, True)
 
-    # Create a padding such to complete the memory setting. padding_y and padding_x
-    # delimits the padding area. They default to 0 if we already reached the max memory
-    # size.
-    padding_y = mem_slot-sequence_max_length if mem_slot-sequence_max_length > 0 else 0
-    padding_x = mem_size-args.input_size if mem_size-args.input_size > 0 else 0
-    padding = torch.nn.ConstantPad2d((0, padding_x, 0, padding_y), -1)
-
     for epoch in tqdm(range(iterations)):
         optimizer.zero_grad()
-
-        # Reset the memory to the original state (0 where it can write, -1 if it cannot)
-        mhx["memory"] = padding(mhx["memory"][:, :sequence_max_length, :args.input_size].fill_(0))
 
         if args.random_length_sequence:
             random_length = np.random.randint(2, sequence_max_length//2+1)
         else:
             random_length = sequence_max_length
+
+        # Create a padding such to complete the memory setting. padding_y and padding_x
+        # delimits the padding area. They default to 0 if we already reached the max memory
+        # size.
+        if args.initialize_memory:
+            padding_y = mem_slot-random_length if mem_slot-random_length > 0 else 0
+            padding_x = mem_size-(args.input_size+1) if mem_size-(args.input_size+1) > 0 else 0
+            padding = torch.nn.ConstantPad2d((0, padding_x, 0, padding_y), -1)
 
         # Use the input size given by the user and increment it by 2 in order to
         # add space for the priority and the delimiter
@@ -248,12 +248,20 @@ if __name__ == "__main__":
         else:
             input_data, target_output, _ = generate_data(batch_size, random_length, args.input_size+3, cuda=args.cuda, steps=args.steps, non_uniform=args.non_uniform_priority, mixture=args.mixture)
 
+        reset_memory = True
+        if args.initialize_memory:
+            # Write inside the memory all the vectors with their priorities
+            # Moreover, reset the input to be all 0
+            mhx["memory"] = padding(input_data[:, :random_length, :args.input_size+1])
+            input_data.fill_(0)
+            reset_memory = False
+
         with autograd.detect_anomaly():
 
             if rnn.debug:
-                output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=False, pass_through_memory=True)
+                output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=reset_memory, pass_through_memory=True)
             else:
-                output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=False, pass_through_memory=True)
+                output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=reset_memory, pass_through_memory=True)
 
             # We compute the loss by taking into account only the vectors and not
             # the delimiter bit or the priority. This has to be done in order to
