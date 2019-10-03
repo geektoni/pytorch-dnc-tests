@@ -216,6 +216,7 @@ if __name__ == "__main__":
 
     # List for keeping useful data
     last_costs = []
+    last_costs_memory = []
     last_losses = []
 
     # Create the loss object
@@ -307,16 +308,23 @@ if __name__ == "__main__":
             current_cost = compute_cost(sigm(output[:, -random_length:, :-3]), target_output[:,:,:-3], batch_size=batch_size).item()
             last_costs.append(current_cost)
 
+            current_memory_cost = compute_cost(sigm(mhx["memory"][:, :random_length, :args.input_size]), target_output[:,:,:-3], batch_size=batch_size).item()
+            last_costs_memory.append(current_memory_cost)
+
             if summarize:
                 llprint("\n\t[*] Iteration {ep}/{tot}".format(ep=epoch, tot=iterations))
                 loss = np.mean(last_losses)
                 cost = np.mean(last_costs)
+                memory_cost = np.mean(last_costs_memory)
                 log_value('train_loss', loss, epoch)
                 log_value('bit_error_per_sequence', cost, epoch)
+                log_value('bit_error_per_memory', memory_cost, epoch)
                 last_losses = []
                 last_costs = []
+                last_costs_memory = []
                 llprint("\n\t[*] Avg. Logistic Loss: %.4f" % (loss))
-                llprint("\n\t[*] Avg. Cost: %4f\n"% (cost))
+                llprint("\n\t[*] Avg. Cost: %4f"% (cost))
+                llprint("\n\t[*] Avg. Memory Cost: %4f\n"% (memory_cost))
                 if np.isnan(loss):
                     raise Exception('We computed a NaN Loss')
 
@@ -324,6 +332,7 @@ if __name__ == "__main__":
                 loss = np.mean(last_losses)
                 last_losses = []
                 last_costs = []
+                last_costs_memory = []
 
             if args.visdom:
                 if args.memory_type == 'dnc':
