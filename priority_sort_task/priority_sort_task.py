@@ -71,6 +71,7 @@ if __name__ == "__main__":
     parser.add_argument('-compute_output_loss', type=float, default=1, metavar='N', help='Weighting over computing also the output loss.')
 
     parser.add_argument('-initialize_memory', action="store_true", help='Initialize the memory with the input')
+    parser.add_argument('-step_memory', type=int, default=1, metavar='N', help='How many steps we give when looking at the memory')
 
     args = parser.parse_args()
     print(args)
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     timestamp = date.strftime("%d%m%Y%H%M%S")
 
     # Generate the name of this experiment
-    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
+    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
         args.input_size,
         args.rnn_type,
         args.nhid,
@@ -96,8 +97,9 @@ if __name__ == "__main__":
         args.curriculum_increment,
         args.curriculum_freq,
         args.initialize_memory,
-        args.compute_memory_loss,
-        args.compute_output_loss,
+        int(args.compute_memory_loss),
+        int(args.compute_output_loss),
+        args.step_memory,
         timestamp
     )
 
@@ -256,7 +258,13 @@ if __name__ == "__main__":
             # Write inside the memory all the vectors with their priorities
             # Moreover, reset the input to be all 0
             mhx["memory"] = padding(input_data[:, :random_length, :args.input_size+1])
-            input_data.fill_(0)
+
+            # This way we can implement N^2 even with random length
+            step_memory = args.step_memory
+            if step_memory == sequence_max_length:
+                step_memory = random_length
+
+            input_data = torch.zeros(batch_size, random_length*step_memory, args.input_size+3)
             reset_memory = False
 
         with autograd.detect_anomaly():
