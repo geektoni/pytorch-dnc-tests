@@ -95,6 +95,9 @@ if __name__ == "__main__":
         args.random_length_sequence,
         args.curriculum_increment,
         args.curriculum_freq,
+        args.initialize_memory,
+        args.compute_memory_loss,
+        args.compute_output_loss,
         timestamp
     )
 
