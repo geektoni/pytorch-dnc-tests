@@ -72,6 +72,7 @@ if __name__ == "__main__":
 
     parser.add_argument('-initialize_memory', action="store_true", help='Initialize the memory with the input')
     parser.add_argument('-step_memory', type=int, default=1, metavar='N', help='How many steps we give when looking at the memory')
+    parser.add_argument('-copy_operation', action="store_true", help='Initialize the memory with the input')
 
     args = parser.parse_args()
     print(args)
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     timestamp = date.strftime("%d%m%Y%H%M%S")
 
     # Generate the name of this experiment
-    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
+    experiment_name = "priority_sort_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}".format(
         args.input_size,
         args.rnn_type,
         args.nhid,
@@ -100,6 +101,7 @@ if __name__ == "__main__":
         int(args.compute_memory_loss),
         int(args.compute_output_loss),
         args.step_memory,
+        args.copy_operation,
         timestamp
     )
 
@@ -151,7 +153,8 @@ if __name__ == "__main__":
         gpu_id=args.cuda,
         debug=True,
         batch_first=True,
-        independent_linears=independent_linears
+        independent_linears=independent_linears,
+        copy_operation=args.copy_operation
     )
     elif args.memory_type == 'sdnc':
         rnn = SDNC(
