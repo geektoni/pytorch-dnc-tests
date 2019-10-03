@@ -67,6 +67,9 @@ if __name__ == "__main__":
     parser.add_argument('-model', type=str, default="", help='Model checkpoint used to perform the tests.')
     parser.add_argument('-random_length_sequence', action="store_true", help='Employ random length sequences to train the model.')
 
+    parser.add_argument('-compute_memory_loss', type=float, default=0, metavar='N', help='Weighting over computing also the memory loss.')
+    parser.add_argument('-compute_output_loss', type=float, default=1, metavar='N', help='Weighting over computing also the output loss.')
+
     args = parser.parse_args()
     print(args)
 
@@ -212,9 +215,22 @@ if __name__ == "__main__":
     bce_loss = nn.BCELoss(reduction='mean')
     sigm = nn.Sigmoid()
 
-    (chx, mhx, rv) = (None, None, None)
+    # Initialize the memory area with a -1 to denote the area which
+    # is not useful to store the read vectors
+    chx, mhx, rv = rnn._init_hidden(None, batch_size, True)
+
+    # Create a padding such to complete the memory setting. padding_y and padding_x
+    # delimits the padding area. They default to 0 if we already reached the max memory
+    # size.
+    padding_y = mem_slot-sequence_max_length if mem_slot-sequence_max_length > 0 else 0
+    padding_x = mem_size-args.input_size if mem_size-args.input_size > 0 else 0
+    padding = torch.nn.ConstantPad2d((0, padding_x, 0, padding_y), -1)
+
     for epoch in tqdm(range(iterations)):
         optimizer.zero_grad()
+
+        # Reset the memory to the original state (0 where it can write, -1 if it cannot)
+        mhx["memory"] = padding(mhx["memory"][:, :sequence_max_length, :args.input_size].fill_(0))
 
         if args.random_length_sequence:
             random_length = np.random.randint(2, sequence_max_length//2+1)
@@ -235,16 +251,19 @@ if __name__ == "__main__":
         with autograd.detect_anomaly():
 
             if rnn.debug:
-                output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
+                output, (chx, mhx, rv), v = rnn(input_data, (None, mhx, None), reset_experience=False, pass_through_memory=True)
             else:
-                output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=True, pass_through_memory=True)
-
+                output, (chx, mhx, rv) = rnn(input_data, (None, mhx, None), reset_experience=False, pass_through_memory=True)
 
             # We compute the loss by taking into account only the vectors and not
             # the delimiter bit or the priority. This has to be done in order to
-            # have a negative loss.
-            loss = bce_loss(sigm(output[:, -random_length:, :-3]), target_output[:,:,:-3])
+            # have a negative loss. We also consider the memory loss (we want to
+            # force the DNC to order the elements when it reads them).
+            output_loss = bce_loss(sigm(output[:, -random_length:, :-3]), target_output[:,:,:-3])
+            memory_loss = bce_loss(sigm(mhx["memory"][:, :random_length, :args.input_size]), target_output[:,:,:-3])
 
+            # Do a linear combination of the two losses
+            loss = np.sum([output_loss*args.compute_output_loss, memory_loss*args.compute_memory_loss])
             loss.backward()
 
             T.nn.utils.clip_grad_norm_(rnn.parameters(), args.clip)
