@@ -154,7 +154,7 @@ if __name__ == "__main__":
         debug=True,
         batch_first=True,
         independent_linears=independent_linears,
-        copy_operation=args.copy_operation
+        copy_mode=args.copy_operation
     )
     elif args.memory_type == 'sdnc':
         rnn = SDNC(
